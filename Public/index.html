@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050914">
+<title>WALL ARENA</title>
+<style>
+:root{--bg:#050914;--card:#0b1530;--ln:#2a7bff;--tx:#e8f0ff;--mut:#9db2d8}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0 auto;max-width:760px;padding:env(safe-area-inset-top) 12px calc(12px + env(safe-area-inset-bottom));color:var(--tx);font:16px/1.4 system-ui,sans-serif;background:radial-gradient(circle at 50% -10%,#10265f,transparent 60%)}
+h1{text-align:center;letter-spacing:.25em;margin:16px 0 0;text-shadow:0 0 16px var(--ln)}
+.sub{text-align:center;color:var(--mut);margin:4px 0 8px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:16px;padding:14px;margin:12px 0;box-shadow:0 0 14px #2a7bff44}
+button,select,input{font:inherit;color:var(--tx);background:#0d1d45;border:1px solid var(--ln);border-radius:12px;padding:10px 12px;min-height:46px;max-width:100%}
+button{cursor:pointer}
+button.pri,button.on{background:var(--ln);color:#fff}
+button:disabled{opacity:.4}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.row>*{flex:1 1 110px}
+label{color:var(--mut);font-size:.85rem;display:block}
+[hidden]{display:none!important}
+ul{list-style:none;padding:0;margin:0}
+li{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #16306b}
+li i,.pl i{width:14px;height:14px;border-radius:50%;background:var(--c);flex:none;box-shadow:0 0 8px var(--c)}
+li b{margin-left:auto}
+#top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#bar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.pl{flex:1 1 140px;display:flex;gap:6px;align-items:center;border:1px solid #16306b;border-radius:12px;padding:6px 8px;font-size:.9rem}
+.pl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.pl.act{border-color:var(--c);box-shadow:0 0 10px var(--c)}
+.pl.dead{opacity:.35}
+#wrap{overflow:auto;max-height:64vh;border:1px solid var(--ln);border-radius:14px;touch-action:pan-x pan-y pinch-zoom;background:#070e24}
+canvas{display:block}
+#conn{font-size:.8rem;padding:2px 8px;border-radius:99px;border:1px solid currentColor}
+#conn.c1{color:#4ade80}#conn.c0{color:#f87171}#conn.c2{color:#facc15}
+#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1b0b14;border:1px solid #f43f5e;padding:10px 14px;border-radius:12px;z-index:9;max-width:90vw}
+#over{text-align:center}
+dialog{background:var(--card);color:var(--tx);border:1px solid var(--ln);border-radius:16px;max-width:92vw}
+</style>
+</head>
+<body>
+<h1>WALL ARENA</h1>
+<p class="sub">Block your rivals. Reach the far edge first. <span id="conn"></span></p>
+
+<section id="menu" class="card">
+  <label for="name">Your name</label>
+  <input id="name" maxlength="16" placeholder="Guest" autocomplete="nickname">
+  <div class="row">
+    <div><label for="mode">Mode</label><select id="mode"><option value="1v1">1v1 (2 players)</option><option value="1v2">1v2 (3 players)</option><option value="1v3">1v3 (4 players)</option><option value="ffa">Free-for-all (3–4)</option></select></div>
+    <div><label for="size">Board</label><select id="size"><option>10</option><option>20</option><option>30</option><option>40</option><option>50</option></select></div>
+    <div><label for="turn">Turn timer</label><select id="turn"><option value="15">15 s</option><option value="30" selected>30 s</option><option value="60">60 s</option><option value="90">90 s</option></select></div>
+  </div>
+  <div class="row"><button class="pri" id="quick">Quick match</button><button id="create">Create private room</button></div>
+  <div class="row"><input id="code" maxlength="5" placeholder="Room code" autocapitalize="characters" aria-label="Room code"><button id="join">Join room</button></div>
+  <div class="row"><button id="helpBtn">Help and rules</button></div>
+</section>
+
+<section id="lobby" class="card" hidden>
+  <div class="row" style="align-items:center"><div>Room <b id="rc" style="font-size:1.6rem;letter-spacing:.2em"></b></div><button id="copy">Copy code</button><button id="share">Share</button></div>
+  <p id="info" class="sub"></p>
+  <ul id="plist"></ul>
+  <p id="lstat" class="sub"></p>
+  <div class="row"><button class="pri" id="ready">Ready</button><button class="leave">Leave</button></div>
+</section>
+
+<section id="game" hidden>
+  <div id="top"><span id="turnTxt"></span><span><span id="clock"></span> <span id="mt"></span></span></div>
+  <div id="bar"></div>
+  <div id="wrap"><canvas id="cv"></canvas></div>
+  <div class="row"><button data-m="m" class="on">Move</button><button data-m="h">Wall ▬</button><button data-m="v">Wall ▮</button><button class="pri" id="confirm" hidden>Place wall</button></div>
+  <div class="row"><button class="leave">Exit match</button><button id="helpBtn2">Rules</button></div>
+  <div id="over" class="card" hidden><h2 id="res"></h2><p id="resTxt"></p><div class="row"><button class="pri" id="rematch">Rematch</button><button class="leave">Leave</button></div></div>
+</section>
+
+<dialog id="help">
+<h3>How to play</h3>
+<p><b>Goal:</b> bring your token to the opposite edge (blue ↑, red ↓, green →, yellow ←). Your goal edge is tinted in your colour.</p>
+<p><b>Your turn:</b> move one step (tap a dot or use the arrow keys) <i>or</i> place one wall. Walls are 2 cells long. Pick Wall ▬ or ▮, tap a grid corner to preview, then Place wall. Walls can’t overlap or cross, and can’t cut anyone off completely.</p>
+<p><b>Jumps:</b> an adjacent token can be jumped; if a wall or the edge is behind it, step diagonally around it.</p>
+<p><b>Walls:</b> every player gets ⌊size² ÷ 10⌋: 10 on 10×10 up to 250 on 50×50.</p>
+<p><b>Winning:</b> 1v1 and free-for-all: first to their goal. 1v2 / 1v3: blue plays alone and wins by reaching the goal; the other team wins when any teammate does. Blue moves first, then seats rotate.</p>
+<p><b>Timer:</b> a missed turn is played for you (a step toward the goal); 3 misses in a row forfeit. Offline players are auto-played and can reconnect with the same browser.</p>
+<button onclick="this.closest('dialog').close()">Close</button>
+</dialog>
+<div id="toast" hidden></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const COL = { blue: '#3b82f6', red: '#ef4444', green: '#22c55e', yellow: '#facc15' };
+const hex = () => [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+const esc = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+const store = (k, v) => { try { return v === undefined ? localStorage[k] : (localStorage[k] = v); } catch { return v; } };
+const nm = () => $('#name').value.trim() || 'Guest';
+const token = store('wa_t') || store('wa_t', hex());
+let S = null, mode = 'm', prev = null, skew = 0, lastV = -1;
+
+$('#name').value = store('wa_n') || '';
+const q = new URLSearchParams(location.search).get('room');
+if (q) $('#code').value = q.toUpperCase().slice(0, 5);
+
+const socket = io();
+const setConn = c => { const e = $('#conn'); e.className = 'c' + c; e.textContent = ['Offline', 'Online', 'Reconnecting…'][c]; };
+setConn(2);
+socket.on('connect', () => { setConn(1); socket.emit('hello', { token, name: nm() }); });
+socket.on('disconnect', () => setConn(0));
+socket.io.on('reconnect_attempt', () => setConn(2));
+socket.on('err', toast);
+socket.on('room', r => {
+  S = r;
+  if (r) { skew = r.now - Date.now(); if (r.version !== lastV) { prev = null; lastV = r.version; } }
+  render();
+});
+
+function toast(m) {
+  const t = $('#toast'); t.textContent = m; t.hidden = false;
+  clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 2600);
+}
+const send = (ev, d) => { store('wa_n', nm()); socket.emit(ev, { name: nm(), ...d }); };
+const act = a => socket.emit('act', { ...a, id: hex(), v: S.version });
+
+$('#quick').onclick = () => send('quick', { mode: $('#mode').value, size: +$('#size').value });
+$('#create').onclick = () => send('create', { mode: $('#mode').value, size: +$('#size').value, turnSec: +$('#turn').value });
+$('#join').onclick = () => send('join', { code: $('#code').value.trim() });
+$('#ready').onclick = () => socket.emit('ready', { v: !S.players[S.you].ready });
+$('#rematch').onclick = () => socket.emit('rematch');
+document.querySelectorAll('.leave').forEach(b => (b.onclick = () => { socket.emit('leave'); S = null; render(); }));
+$('#helpBtn').onclick = $('#helpBtn2').onclick = () => $('#help').showModal();
+$('#copy').onclick = () => navigator.clipboard?.writeText(S.code).then(() => toast('Code copied'), () => toast('Code: ' + S.code));
+$('#share').onclick = () => {
+  const url = `${location.origin}/?room=${S.code}`, text = `Join my WALL ARENA room: ${S.code}`;
+  if (navigator.share) navigator.share({ title: 'WALL ARENA', text, url }).catch(() => {});
+  else navigator.clipboard?.writeText(`${text} ${url}`).then(() => toast('Link copied'));
+};
+document.querySelectorAll('[data-m]').forEach(b => (b.onclick = () => { mode = b.dataset.m; prev = null; if (S) renderGame(); }));
+
+function show(id) { for (const s of ['menu', 'lobby', 'game']) $('#' + s).hidden = s !== id; }
+function render() {
+  if (!S) return show('menu');
+  if (S.status === 'lobby') return lobby();
+  show('game'); renderGame();
+}
+
+function lobby() {
+  show('lobby');
+  $('#rc').textContent = S.code;
+  $('#info').textContent = `${S.mode.toUpperCase()} · ${S.size}×${S.size} · ${S.wallsPer} walls each · ${S.turnSec}s turns · ${S.pub ? 'public' : 'private'}`;
+  $('#plist').innerHTML = S.players.map(p => `<li style="--c:${COL[p.color]}"><i></i>${esc(p.name)}${p.seat === S.you ? ' (you)' : ''} <small>team ${p.team + 1}</small><b>${p.on ? (p.ready ? 'Ready' : 'Waiting') : 'Offline'}</b></li>`).join('');
+  $('#ready').textContent = S.players[S.you].ready ? 'Not ready' : 'Ready';
+  $('#lstat').textContent = S.countdown ? 'Starting in a few seconds…' : 'The match starts when the required players are all ready.';
+}
+
+function renderGame() {
+  const me = S.players[S.you], playing = S.status === 'playing', mine = playing && S.turn === S.you;
+  $('#turnTxt').innerHTML = playing ? (mine ? '<b>Your turn</b>' : `${esc(S.players[S.turn].name)}’s turn`) : 'Match over';
+  $('#bar').innerHTML = S.players.map(p => `<div class="pl${playing && p.seat === S.turn ? ' act' : ''}${p.alive === false ? ' dead' : ''}" style="--c:${COL[p.color]}"><i></i><span>${esc(p.name)}${p.seat === S.you ? ' (you)' : ''}</span><b>🧱${p.walls}</b><small>T${p.team + 1}${p.on ? '' : ' ⚠'}</small></div>`).join('');
+  document.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+  $('#confirm').hidden = !prev; $('#confirm').disabled = !mine;
+  $('#over').hidden = playing;
+  if (!playing) {
+    $('#res').textContent = S.winner === -1 ? 'No winner' : S.winner === me.team ? '🏆 Victory!' : 'Defeat';
+    $('#resTxt').textContent = S.winner === -1 ? '' : 'Winner: ' + S.players.filter(p => p.team === S.winner).map(p => p.name).join(' + ');
+    $('#rematch').textContent = `Rematch (${S.votes}/${S.players.filter(p => !p.left).length})`;
+  }
+  draw();
+}
+
+const rr = (c, ...a) => (c.roundRect ? c.roundRect(...a) : c.rect(...a.slice(0, 4)));
+function draw() {
+  const n = S.size, cv = $('#cv'), c = cv.getContext('2d'), dpr = Math.min(devicePixelRatio || 1, 2);
+  const cs = Math.max(22, Math.min(56, Math.floor((Math.min(innerWidth, 760) - 28) / n))), W = n * cs; // big boards scroll inside #wrap
+  if (cv.width !== W * dpr) { cv.width = cv.height = W * dpr; cv.style.width = cv.style.height = W + 'px'; }
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, W);
+  c.fillStyle = '#0c1a40'; c.strokeStyle = '#1d4fb8'; c.lineWidth = 1; c.beginPath();
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) rr(c, x * cs + 2, y * cs + 2, cs - 4, cs - 4, 5);
+  c.fill(); c.stroke();
+  S.players.forEach(p => { // goal edges
+    c.fillStyle = COL[p.color] + '99';
+    c.fillRect(...[[0, 0, W, 4], [W - 4, 0, 4, W], [0, W - 4, W, 4], [0, 0, 4, W]][[0, 2, 1, 3][p.seat]]);
+  });
+  const me = S.players[S.you];
+  if (S.status === 'playing' && S.turn === S.you && mode === 'm') {
+    c.fillStyle = COL[me.color] + '66';
+    for (const [x, y] of S.legal) { c.beginPath(); c.arc((x + .5) * cs, (y + .5) * cs, cs * .3, 0, 7); c.fill(); }
+  }
+  const wall = (o, x, y, col) => {
+    c.fillStyle = col;
+    if (o === 'h') c.fillRect(x * cs + 2, (y + 1) * cs - 3, 2 * cs - 4, 6); else c.fillRect((x + 1) * cs - 3, y * cs + 2, 6, 2 * cs - 4);
+  };
+  S.hw.forEach(k => wall('h', k >> 6, k & 63, '#bfe0ff'));
+  S.vw.forEach(k => wall('v', k >> 6, k & 63, '#bfe0ff'));
+  if (prev) wall(prev.o, prev.x, prev.y, COL[me.color] + 'cc');
+  for (const p of S.players) if (p.alive !== false) {
+    c.beginPath(); c.arc((p.x + .5) * cs, (p.y + .5) * cs, cs * .36, 0, 7);
+    c.fillStyle = COL[p.color]; c.fill(); c.lineWidth = p.seat === S.you ? 3 : 1.5; c.strokeStyle = '#fff'; c.stroke();
+  }
+}
+
+$('#cv').onclick = e => {
+  if (!S || S.status !== 'playing') return;
+  const r = e.currentTarget.getBoundingClientRect(), k = r.width / S.size, px = (e.clientX - r.left) / k, py = (e.clientY - r.top) / k;
+  if (mode === 'm') {
+    const x = Math.floor(px), y = Math.floor(py);
+    if (S.turn === S.you && S.legal.some(l => l[0] === x && l[1] === y)) act({ t: 'move', x, y });
+    return;
+  }
+  const cl = v => Math.min(S.size - 1, Math.max(1, Math.round(v))); // nearest grid corner
+  prev = { o: mode, x: cl(px) - 1, y: cl(py) - 1 }; renderGame();
+};
+$('#confirm').onclick = () => { if (prev) { act({ t: 'wall', ...prev }); prev = null; renderGame(); } };
+
+addEventListener('keydown', e => {
+  const d = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
+  if (!d || !S || S.status !== 'playing' || S.turn !== S.you || $('#help').open) return;
+  const me = S.players[S.you];
+  const t = S.legal.find(([x, y]) => (x === me.x + d[0] && y === me.y + d[1]) || (x === me.x + 2 * d[0] && y === me.y + 2 * d[1]));
+  if (t) { e.preventDefault(); act({ t: 'move', x: t[0], y: t[1] }); }
+});
+
+setInterval(() => {
+  if (!S || S.status === 'lobby') return;
+  const t = Date.now() + skew, m = Math.max(0, Math.floor(((S.endedAt || t) - S.startedAt) / 1000));
+  $('#clock').textContent = S.status === 'playing' ? Math.max(0, Math.ceil((S.deadline - t) / 1000)) + 's' : '';
+  $('#mt').textContent = `· ${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}, 500);
+</script>
+</body>
+</html>
